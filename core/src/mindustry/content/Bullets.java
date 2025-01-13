@@ -2,8 +2,6 @@ package mindustry.content;
 
 import arc.graphics.*;
 import mindustry.entities.bullet.*;
-import mindustry.entities.effect.*;
-import mindustry.graphics.*;
 
 /**
  * Class for holding special internal bullets.
@@ -39,7 +37,9 @@ public class Bullets{
         damageLightningGround = damageLightning.copy();
         damageLightningGround.collidesAir = false;
 
-        fireball = new FireBulletType(1f, 4);
+        fireball = new FireBulletType(1f, 4){{
+            hittable = false;
+        }};
 
         spaceLiquid = new SpaceLiquidBulletType(){{
             knockback = 0.7f;

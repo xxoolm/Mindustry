@@ -9,15 +9,15 @@ import mindustry.io.*;
 
 import java.util.zip.*;
 
-/**
- * Class for storing all packets.
- */
+/** Class for storing all packets. */
 public class Packets{
 
     public enum KickReason{
         kick, clientOutdated, serverOutdated, banned, gameover(true), recentKick,
         nameInUse, idInUse, nameEmpty, customClient, serverClose, vote, typeMismatch,
         whitelist, playerLimit, serverRestarting;
+
+        public static final KickReason[] all = values();
 
         public final boolean quiet;
 
@@ -40,7 +40,9 @@ public class Packets{
     }
 
     public enum AdminAction{
-        kick, ban, trace, wave
+        kick, ban, trace, wave, switchTeam;
+
+        public static final AdminAction[] all = values();
     }
 
     /** Generic client connection event. */
