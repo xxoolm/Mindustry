@@ -38,6 +38,8 @@ public class SectorInfo{
     public int storageCapacity = 0;
     /** Whether a core is available here. */
     public boolean hasCore = true;
+    /** Whether a world processor is on this map - implies that the map will get cleared. */
+    public boolean hasWorldProcessor;
     /** Whether this sector was ever fully captured. */
     public boolean wasCaptured = false;
     /** Sector that was launched from. */
@@ -82,7 +84,7 @@ public class SectorInfo{
     public transient ItemSeq lastImported = new ItemSeq();
 
     /** Special variables for simulation. */
-    public float sumHealth, sumRps, sumDps, waveHealthBase, waveHealthSlope, waveDpsBase, waveDpsSlope, bossHealth, bossDps, curEnemyHealth, curEnemyDps;
+    public float sumHealth, sumRps, sumDps, bossHealth, bossDps, curEnemyHealth, curEnemyDps;
     /** Wave where first boss shows up. */
     public int bossWave = -1;
 
@@ -150,11 +152,6 @@ public class SectorInfo{
         state.rules.winWave = winWave;
         state.rules.attackMode = attack;
 
-        //assign new wave patterns when the version changes
-        if(waveVersion != Waves.waveVersion && state.rules.sector.preset == null){
-            state.rules.spawns = Waves.generate(state.rules.sector.threat);
-        }
-
         CoreBuild entity = state.rules.defaultTeam.core();
         if(entity != null){
             entity.items.clear();
@@ -180,7 +177,7 @@ public class SectorInfo{
             spawnPosition = entity.pos();
         }
 
-        waveVersion = Waves.waveVersion;
+        hasWorldProcessor = state.teams.present.contains(t -> t.getBuildings(Blocks.worldProcessor).any());
         waveSpacing = state.rules.waveSpacing;
         wave = state.wave;
         winWave = state.rules.winWave;
