@@ -65,22 +65,28 @@ public class Planets{
             clearSectorOnLose = true;
             defaultCore = Blocks.coreBastion;
             iconColor = Color.valueOf("ff9266");
-            hiddenItems.addAll(Items.serpuloItems).removeAll(Items.erekirItems);
+            enemyBuildSpeedMultiplier = 0.4f;
+
+            //TODO disallowed for now
+            allowLaunchToNumbered = false;
 
             //TODO SHOULD there be lighting?
             updateLighting = false;
 
+            defaultAttributes.set(Attribute.heat, 0.8f);
+
             ruleSetter = r -> {
                 r.waveTeam = Team.malis;
-                r.placeRangeCheck = false; //TODO true or false?
-                r.attributes.set(Attribute.heat, 0.8f);
+                r.placeRangeCheck = false;
                 r.showSpawns = true;
                 r.fog = true;
                 r.staticFog = true;
                 r.lighting = false;
                 r.coreDestroyClear = true;
-                r.onlyDepositCore = true; //TODO not sure
+                r.onlyDepositCore = true;
             };
+            campaignRuleDefaults.fog = true;
+            campaignRuleDefaults.showSpawns = true;
 
             unlockedOnLand.add(Blocks.coreBastion);
         }};
@@ -138,8 +144,8 @@ public class Planets{
             ruleSetter = r -> {
                 r.waveTeam = Team.crux;
                 r.placeRangeCheck = false;
-                r.attributes.clear();
                 r.showSpawns = false;
+                r.coreDestroyClear = true;
             };
             iconColor = Color.valueOf("7d4dff");
             atmosphereColor = Color.valueOf("3c1b8f");
@@ -147,8 +153,8 @@ public class Planets{
             atmosphereRadOut = 0.3f;
             startSector = 15;
             alwaysUnlocked = true;
+            allowSelfSectorLaunch = true;
             landCloudColor = Pal.spore.cpy().a(0.5f);
-            hiddenItems.addAll(Items.erekirItems).removeAll(Items.serpuloItems);
         }};
 
         verilus = makeAsteroid("verlius", sun, Blocks.stoneWall, Blocks.iceWall, 0.5f, 12, 2f, gen -> {

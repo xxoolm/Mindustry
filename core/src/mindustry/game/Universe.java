@@ -6,6 +6,7 @@ import arc.struct.*;
 import arc.util.*;
 import mindustry.content.*;
 import mindustry.game.EventType.*;
+import mindustry.game.Schematic.*;
 import mindustry.game.SectorInfo.*;
 import mindustry.gen.*;
 import mindustry.maps.*;
@@ -38,8 +39,10 @@ public class Universe{
 
     /** Update regardless of whether the player is in the campaign. */
     public void updateGlobal(){
-        //currently only updates one solar system
-        updatePlanet(Planets.sun);
+        for(Planet planet : content.planets()){
+            //update all parentless planets (solar system root), regardless of which one the player is in
+            if(planet.parent == null) updatePlanet(planet);
+        }
     }
 
     public int turn(){
@@ -82,7 +85,7 @@ public class Universe{
             }
         }
 
-        if(state.hasSector() && state.getSector().planet.updateLighting){
+        if(state.hasSector() && state.getSector().planet.updateLighting && !(state.getSector().preset != null && state.getSector().preset.noLighting)){
             var planet = state.getSector().planet;
             //update sector light
             float light = state.getSector().getLight();
@@ -113,6 +116,11 @@ public class Universe{
         Core.settings.putJson("launch-resources-seq", lastLaunchResources);
     }
 
+    /** Updates selected loadout for future deployment. Creates an empty schematic with a single core block. */
+    public void updateLoadout(CoreBlock block){
+        updateLoadout(block, new Schematic(Seq.with(new Stile(block, 0, 0, null, (byte)0)), new StringMap(), block.size, block.size));
+    }
+
     /** Updates selected loadout for future deployment. */
     public void updateLoadout(CoreBlock block, Schematic schem){
         Core.settings.put("lastloadout-" + block.name, schem.file == null ? "" : schem.file.nameWithoutExtension());
@@ -120,7 +128,7 @@ public class Universe{
     }
 
     public Schematic getLastLoadout(){
-        if(lastLoadout == null) lastLoadout = state.rules.sector == null || state.rules.sector.planet.generator == null ? Loadouts.basicShard : state.rules.sector.planet.generator.getDefaultLoadout();
+        if(lastLoadout == null) lastLoadout = state.rules.sector == null || state.rules.sector.planet.generator == null ? Loadouts.basicShard : state.rules.sector.planet.generator.defaultLoadout;
         return lastLoadout;
     }
 
@@ -145,38 +153,27 @@ public class Universe{
         turn++;
 
         int newSecondsPassed = (int)(turnDuration / 60);
+        Planet current = state.getPlanet();
 
         //update relevant sectors
         for(Planet planet : content.planets()){
 
-            //first pass: clear import stats
-            for(Sector sector : planet.sectors){
-                if(sector.hasBase() && !sector.isBeingPlayed()){
-                    sector.info.lastImported.clear();
-                }
+            //planets with different wave simulation status are not updated
+            if(current != null && current.allowWaveSimulation != planet.allowWaveSimulation){
+                continue;
             }
 
-            //second pass: update export & import statistics
-            for(Sector sector : planet.sectors){
-                if(sector.hasBase() && !sector.isBeingPlayed()){
-
-                    //export to another sector
-                    if(sector.info.destination != null){
-                        Sector to = sector.info.destination;
-                        if(to.hasBase() && to.planet == planet){
-                            ItemSeq items = new ItemSeq();
-                            //calculated exported items to this sector
-                            sector.info.export.each((item, stat) -> items.add(item, (int)(stat.mean * newSecondsPassed * sector.getProductionScale())));
-                            to.addItems(items);
-                            to.info.lastImported.add(items);
-                        }
-                    }
-                }
+            //don't simulate the planet if there is an in-progress mission on that planet
+            if(!planet.allowWaveSimulation && planet.sectors.contains(s -> s.hasBase() && !s.isBeingPlayed() && s.isAttacked())){
+                continue;
             }
 
             //third pass: everything else
             for(Sector sector : planet.sectors){
                 if(sector.hasBase()){
+                    if(sector.info.importRateCache != null){
+                        sector.info.refreshImportRates(planet);
+                    }
 
                     //if it is being attacked, capture time is 0; otherwise, increment the timer
                     if(sector.isAttacked()){
@@ -187,6 +184,8 @@ public class Universe{
 
                     //increment seconds passed for this sector by the time that just passed with this turn
                     if(!sector.isBeingPlayed()){
+
+                        //TODO: if a planet has sectors under attack and simulation is OFF, just don't simulate it
 
                         //increment time if attacked
                         if(sector.isAttacked()){
@@ -218,10 +217,11 @@ public class Universe{
                         }else if(attacked && wavesPassed > 0 && sector.info.winWave > 1 && sector.info.wave + wavesPassed >= sector.info.winWave && !sector.hasEnemyBase()){
                             //autocapture the sector
                             sector.info.waves = false;
+                            boolean was = sector.info.wasCaptured;
                             sector.info.wasCaptured = true;
 
                             //fire the event
-                            Events.fire(new SectorCaptureEvent(sector));
+                            Events.fire(new SectorCaptureEvent(sector, !was));
                         }
 
                         float scl = sector.getProductionScale();
@@ -232,7 +232,8 @@ public class Universe{
                         sector.info.export.each((item, stat) -> {
                             if(sector.info.items.get(item) <= 0 && sector.info.production.get(item, ExportStat::new).mean < 0 && stat.mean > 0){
                                 //cap export by import when production is negative.
-                                stat.mean = Math.min(sector.info.lastImported.get(item) / (float)newSecondsPassed, stat.mean);
+                                //TODO remove
+                                stat.mean = Math.min(0f, stat.mean);
                             }
                         });
 
@@ -243,8 +244,8 @@ public class Universe{
                     }
 
                     //queue random invasions
-                    if(!sector.isAttacked() && sector.planet.allowSectorInvasion && sector.info.minutesCaptured > invasionGracePeriod && sector.info.hasSpawns){
-                        int count = sector.near().count(Sector::hasEnemyBase);
+                    if(!sector.isAttacked() && sector.planet.campaignRules.sectorInvasion && sector.info.minutesCaptured > invasionGracePeriod && sector.info.hasSpawns){
+                        int count = sector.near().count(s -> s.hasEnemyBase() && !s.hasBase());
 
                         //invasion chance depends on # of nearby bases
                         if(count > 0 && Mathf.chance(baseInvasionChance * (0.8f + (count - 1) * 0.3f))){
